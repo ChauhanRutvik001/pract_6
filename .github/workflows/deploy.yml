@@ -1,0 +1,53 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18.x'  # Set your Node.js version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the frontend
+        run: npm run build  # Assuming you have a build script for your frontend (e.g., `vite`)
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: production-files
+          path: |
+            dist  # Modify if you're using something other than Vite
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Download artifact from build
+        uses: actions/download-artifact@v2
+        with:
+          name: production-files
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'rm -rf /var/www/your-app/*'
+          scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/var/www/your-app/
+
+      - name: Restart server
+        run: ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'sudo systemctl restart your-app'

@@ -1,55 +1,67 @@
-name: CI/CD Pipeline for Windows Server
+name: CI/CD Pipeline
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger the workflow when pushing to the main branch
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: self-hosted  # Use your self-hosted runner (replace with Ubuntu-latest if not self-hosted)
 
     steps:
+      # Step 1: Checkout the code from the repository
       - name: Checkout code
         uses: actions/checkout@v2
-
+      
+      # Step 2: List the working directory files (useful for debugging)
+      - name: List working directory
+        run: ls -R
+      
+      # Step 3: Set up Node.js environment (you can adjust the version)
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v2
         with:
-          node-version: '18.x'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build the frontend
-        run: npm run build
-
-      - name: Archive production artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: production-files
-          path: |
-            dist
-
-  deploy:
-    runs-on: windows-latest
-    needs: build
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Download artifact from build
-        uses: actions/download-artifact@v2
-        with:
-          name: production-files
-
-      - name: Deploy using PowerShell
+          node-version: '18'  # Use Node.js 18 or your preferred version
+      
+      # Step 4: Configure Git (increase the post buffer size for large payloads)
+      - name: Configure Git
         run: |
-          $password = ConvertTo-SecureString ${{ secrets.SERVER_PASSWORD }} -AsPlainText -Force
-          $cred = New-Object System.Management.Automation.PSCredential ( ${{ secrets.SERVER_USER }}, $password)
-          Invoke-Command -ComputerName ${{ secrets.SERVER_IP }} -Credential $cred -ScriptBlock {
-            Copy-Item -Path "C:\path\to\local\dist\*" -Destination "C:\path\to\server\directory" -Recurse
-            Restart-Service -Name "YourAppService"
-          }
-        shell: pwsh
+          git config --global http.postBuffer 524288000  # 500 MB
+      
+      # Step 5: Install backend dependencies
+      - name: Install backend dependencies
+        run: |
+          cd Backend  # Navigate to the backend directory
+          npm install  # Install the backend dependencies
+      
+      # Step 6: Install frontend dependencies
+      - name: Install frontend dependencies
+        run: |
+          cd src  # Navigate to the src folder where your frontend is
+          npm install  # Install the frontend dependencies
+      
+      # Step 7: Run backend tests (optional, depending on your project)
+      - name: Run backend tests
+        run: |
+          cd Backend
+          npm test  # Replace with your test script if available
+
+      # Step 8: Run frontend tests (optional, depending on your project)
+      - name: Run frontend tests
+        run: |
+          cd src
+          npm test  # Replace with your test script if available
+
+      # Step 9: Build the frontend (create the production build)
+      - name: Build frontend
+        run: |
+          cd src
+          npm run build  # Build the frontend app (this assumes you have a build script in package.json)
+
+      # Step 10: Deploy to the server (adjust this step for your server)
+      - name: Deploy to server
+        run: |
+          # Replace this with your actual deployment script or commands
+          echo "Deploying the application..."
+          # For example, you can use FTP, SCP, or another method to copy the build to your server

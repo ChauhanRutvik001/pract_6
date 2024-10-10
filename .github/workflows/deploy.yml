@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI/CD Pipeline for Windows Server
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -16,23 +16,23 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'  # Set your Node.js version
+          node-version: '18.x'
 
       - name: Install dependencies
         run: npm install
 
       - name: Build the frontend
-        run: npm run build  # Assuming you have a build script for your frontend (e.g., `vite`)
+        run: npm run build
 
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: production-files
           path: |
-            dist  # Modify if you're using something other than Vite
+            dist
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: build
 
     steps:
@@ -44,10 +44,12 @@ jobs:
         with:
           name: production-files
 
-      - name: Deploy to server
+      - name: Deploy using PowerShell
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'rm -rf /var/www/your-app/*'
-          scp -o StrictHostKeyChecking=no -r dist/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }}:/var/www/your-app/
-
-      - name: Restart server
-        run: ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} 'sudo systemctl restart your-app'
+          $password = ConvertTo-SecureString ${{ secrets.SERVER_PASSWORD }} -AsPlainText -Force
+          $cred = New-Object System.Management.Automation.PSCredential ( ${{ secrets.SERVER_USER }}, $password)
+          Invoke-Command -ComputerName ${{ secrets.SERVER_IP }} -Credential $cred -ScriptBlock {
+            Copy-Item -Path "C:\path\to\local\dist\*" -Destination "C:\path\to\server\directory" -Recurse
+            Restart-Service -Name "YourAppService"
+          }
+        shell: pwsh
